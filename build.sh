@@ -1,10 +1,10 @@
 #!/bin/bash
 
 app_wasm="dist/app.wasm"
-app_include="build/app_bytes.c"
+app_include="generated/app_bytes.c"
 comp_wasm="dist/compiler.wasm"
 
-mkdir -p build dist
+mkdir -p generated dist
 
 zig9 build-lib -target wasm32-freestanding-musl -dynamic src/app.c -O ReleaseSmall -femit-bin=$app_wasm
 

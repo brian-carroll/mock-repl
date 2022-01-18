@@ -1,4 +1,4 @@
-#include "../build/app_bytes.c"
+#include "../generated/app_bytes.c"
 
 // #define COUNTDOWN_START_BYTE_OFFSET 0xf9
 #define COUNTDOWN_START_BYTE_OFFSET 0xf5 // ReleaseSmall
