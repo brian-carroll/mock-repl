@@ -77,35 +77,42 @@
       <section class="text">
         <h1>A mockin' Roc REPL!</h1>
         <p>
-          This is a <strong>mock-up</strong> of a Web REPL for Roc. But instead
-          of the actual Roc language, it only accepts numbers 0-255! It
-          "compiles" a Wasm module that counts down from that number, and runs
-          it.
+          This is a <strong>mock-up</strong> Web REPL for a fake compiler. The
+          only valid inputs are the numbers 0-255! It "compiles" a Wasm module
+          that counts backwards from that number to 1.
         </p>
         <p>
           The same web page should work with minimal adjustments whenever we
-          manage to get a WebAssembly build of the real Roc compiler working.
-          But it was a <i>lot</i> easier to debug with a tiny mock compiler!
+          manage to get a WebAssembly build of the Roc compiler working. But
+          this way, I was able to build up the functionality more gradually.
         </p>
         <p>How it works</p>
         <ul>
-          <li>Two Wasm modules: a fake "compiler", and a fake "app"</li>
+          <li>There are two Wasm modules: a "compiler", and an "app"</li>
           <li>
             The "compiler" is a little program that contains an array of bytes,
             and a function that can modify exactly one of those bytes. The other
             bytes are just constant numbers... that "just happen" to form a
-            valid WebAssembly module, because I cheated.
+            valid WebAssembly module (because I cheated).
           </li>
           <li>
-            JS calls the "compiler" with your input, and it sets the editable
-            byte of the app to the value you chose. JS then reads the whole byte
-            array, creates a WebAssembly instance from it, and runs it.
+            JS calls the "compiler" with your input, and overwrites one byte of
+            the app with it. JS then reads the whole byte array, creates a
+            WebAssembly instance from it, and runs it.
           </li>
           <li>
-            The app returns an array of bytes representing all the numbers in
-            the countdown.
+            The Wasm app returns the address in its own memory where it wrote
+            the result.
           </li>
-          <li>JS transforms those numbers to a string to display</li>
+          <li>
+            JS calls back into another function in the "compiler", passing the
+            entire memory of the app as an array of bytes, and the index of the
+            result in that array.
+          </li>
+          <li>
+            The "compiler" then finds the array of numbers and stringifies it.
+          </li>
+          <li>JS reads the string and displays it</li>
         </ul>
       </section>
 
@@ -124,105 +131,7 @@
         />
       </section>
     </div>
-    <script>
-      const elemSourceInput = document.getElementById("source-input");
-      const elemHistory = document.getElementById("history-text");
-      const historyArray = [];
-      let compiler;
-      loadCompiler("dist/compiler.wasm");
-
-      elemSourceInput.addEventListener("change", onPressEnter);
-
-      // -----------------------------------------------------------------
-
-      async function onPressEnter(event) {
-        const { target } = event;
-        const inputText = target.value;
-        const countdownStart = parseInt(inputText);
-
-        try {
-          const countdown = await compileAndRunApp(countdownStart);
-          const outputText = "[ " + countdown.join(", ") + " ]";
-          historyArray.push({ ok: true, inputText, outputText });
-        } catch (e) {
-          const outputText = `${e}`;
-          historyArray.push({ ok: false, inputText, outputText });
-        }
-
-        target.value = "";
-
-        renderHistory();
-      }
-
-      // -----------------------------------------------------------------
-
-      async function compileAndRunApp(countdownStart) {
-        const appBytes = compileAppToBytes(countdownStart);
-        const { instance: app } = await WebAssembly.instantiate(appBytes);
-        return runApp(app);
-      }
-
-      // -----------------------------------------------------------------
-
-      function compileAppToBytes(countdownStart) {
-        if (countdownStart < 0 || countdownStart > 255) {
-          throw new Error(
-            "I only understand numbers from 0-255, because I'm a fake compiler"
-          );
-        }
-
-        const sliceAddr = compiler.exports.compile_app(countdownStart);
-        return getSlice(compiler, sliceAddr);
-      }
-
-      // -----------------------------------------------------------------
-
-      function runApp(app) {
-        const sliceAddr = app.exports.run();
-        return getSlice(app, sliceAddr);
-      }
-
-      // -----------------------------------------------------------------
-
-      function getSlice(instance, sliceAddr) {
-        const memory32 = new Uint32Array(instance.exports.memory.buffer);
-        const memory8 = new Uint8Array(instance.exports.memory.buffer);
-
-        const sliceIndex32 = sliceAddr >> 2;
-        const sliceElements = memory32[sliceIndex32];
-        const sliceLength = memory32[sliceIndex32 + 1];
-
-        return memory8.slice(sliceElements, sliceElements + sliceLength);
-      }
-
-      // -----------------------------------------------------------------
-
-      function renderHistory() {
-        elemHistory.innerHTML = "";
-        historyArray.forEach(({ ok, inputText, outputText }) => {
-          const inputElem = document.createElement("div");
-          const outputElem = document.createElement("div");
-
-          inputElem.textContent = "> " + inputText;
-          inputElem.classList.add("input");
-
-          outputElem.textContent = outputText;
-          outputElem.classList.add("output");
-          outputElem.classList.add(ok ? "output-ok" : "output-error");
-
-          elemHistory.appendChild(inputElem);
-          elemHistory.appendChild(outputElem);
-        });
-        elemHistory.scrollTop = elemHistory.scrollHeight;
-      }
-
-      // -----------------------------------------------------------------
-
-      async function loadCompiler(filename) {
-        const response = fetch(filename);
-        const { instance } = await WebAssembly.instantiateStreaming(response);
-        compiler = instance;
-      }
-    </script>
+    <script src="src/wasi.js"></script>
+    <script src="src/repl.js"></script>
   </body>
 </html>

@@ -13,4 +13,4 @@ zig9 build-lib -target wasm32-freestanding-musl -dynamic src/app.c -femit-bin=$a
 
 ./print_bytes_as_c_code.js $app_wasm > $app_include
 
-zig9 build-lib -target wasm32-freestanding-musl -dynamic src/compiler.c -femit-bin=$comp_wasm
+zig9 build-lib -target wasm32-wasi -dynamic -lc src/compiler.c -O ReleaseSmall -femit-bin=$comp_wasm
