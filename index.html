@@ -1,0 +1,137 @@
+<html>
+  <head>
+    <style>
+      body {
+        background-color: #222;
+        color: #ccc;
+        font-family: sans-serif;
+        font-size: 18px;
+      }
+      .body-wrapper {
+        display: flex;
+        flex-direction: column;
+        max-width: 900px;
+        height: 100%;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      h1 {
+        margin: 32px auto;
+        color: #eee;
+        text-align: center;
+      }
+      li {
+        margin: 8px;
+      }
+      section.history {
+        flex: 1;
+      }
+      .scroll-wrap {
+        position: relative;
+        height: 100%;
+      }
+      .scroll {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        overflow: auto;
+      }
+      #history-text {
+        margin: 16px 0;
+        padding: 8px;
+      }
+      #history-text .input {
+        margin-bottom: 8px;
+      }
+      #history-text .output {
+        margin-bottom: 16px;
+      }
+      #history-text .output-ok {
+        color: #0f8;
+      }
+      #history-text .output-error {
+        color: #f00;
+      }
+      .code {
+        font-family: "Courier New", Courier, monospace;
+        background-color: #111;
+        color: #fff;
+      }
+      section.source {
+        display: flex;
+        flex-direction: column;
+      }
+
+      section.source input {
+        height: 32px;
+        padding: 8px;
+        margin-bottom: 16px;
+      }
+    </style>
+    <title>Mock REPL</title>
+  </head>
+  <body>
+    <div class="body-wrapper">
+      <section class="text">
+        <h1>A mockin' Roc REPL!</h1>
+        <p>
+          This is a <strong>mock-up</strong> Web REPL for a fake compiler. The
+          only valid inputs are the numbers 0-255! It "compiles" a Wasm module
+          that counts backwards from that number to 1.
+        </p>
+        <p>
+          The same web page should work with minimal adjustments whenever we
+          manage to get a WebAssembly build of the Roc compiler working. But
+          this way, I was able to build up the functionality more gradually.
+        </p>
+        <p>How it works</p>
+        <ul>
+          <li>There are two Wasm modules: a "compiler", and an "app"</li>
+          <li>
+            The "compiler" is a little program that contains an array of bytes,
+            and a function that can modify exactly one of those bytes. The other
+            bytes are just constant numbers... that "just happen" to form a
+            valid WebAssembly module (because I cheated).
+          </li>
+          <li>
+            JS calls the "compiler" with your input, and overwrites one byte of
+            the app with it. JS then reads the whole byte array, creates a
+            WebAssembly instance from it, and runs it.
+          </li>
+          <li>
+            The Wasm app returns the address in its own memory where it wrote
+            the result.
+          </li>
+          <li>
+            JS calls back into another function in the "compiler", passing the
+            entire memory of the app as an array of bytes, and the index of the
+            result in that array.
+          </li>
+          <li>
+            The "compiler" then finds the array of numbers and stringifies it.
+          </li>
+          <li>JS reads the string and displays it</li>
+        </ul>
+      </section>
+
+      <section class="history">
+        <div class="scroll-wrap">
+          <div id="history-text" class="scroll code"></div>
+        </div>
+      </section>
+
+      <section class="source">
+        <input
+          id="source-input"
+          class="code"
+          type="number"
+          placeholder="Type a number 0-255 and press Enter"
+        />
+      </section>
+    </div>
+    <script src="src/wasi.js"></script>
+    <script src="src/repl.js"></script>
+  </body>
+</html>
