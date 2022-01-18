@@ -1,6 +1,6 @@
 #!/bin/bash
 
-app_wasm="dist/app.wasm"
+app_wasm="generated/app.wasm"
 app_include="generated/app_bytes.c"
 comp_wasm="dist/compiler.wasm"
 
