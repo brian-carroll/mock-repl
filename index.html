@@ -1,0 +1,166 @@
+<html>
+  <head>
+    <style>
+      body {
+        background-color: #111;
+        color: #ccc;
+        font-family: sans-serif;
+        font-size: 18px;
+      }
+      .body-wrapper {
+        display: flex;
+        flex-direction: column;
+        max-width: 900px;
+        height: 100%;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      h1 {
+        margin: 32px auto;
+      }
+      li {
+        margin: 8px;
+      }
+      section.history {
+        flex: 1;
+      }
+      .scroll-wrap {
+        position: relative;
+        height: 100%;
+      }
+      .scroll {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        overflow: auto;
+      }
+      section.source {
+        display: flex;
+        flex-direction: column;
+      }
+
+      section.source input {
+        height: 50px;
+        background-color: #000;
+        color: #fff;
+        font-family: "Courier New", Courier, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="body-wrapper">
+      <section class="text">
+        <h1>The mockin' Roc REPL!</h1>
+        <p>
+          This is a <strong>mock-up</strong> of a Web REPL for Roc. It's all
+          fake, there is no actual Roc compiler here... yet. The purpose is to
+          make some progress on the Web UI with simple Wasm modules, to get a
+          clearer picture of what we're aiming for.
+        </p>
+        <p>
+          The only valid inputs are numbers from 0-255, and it only "compiles" a
+          program that will count down from that number to zero.
+        </p>
+        <p>What we <i>do</i> have is</p>
+        <ul>
+          <li>Two Wasm modules: a fake "compiler", and a fake "app"</li>
+          <li>
+            The "compiler" contains an array of bytes that it can modify, based
+            on your input, and pass to JS
+          </li>
+          <li>
+            JS takes those bytes, turns them into a WebAssembly "app", and runs
+            it
+          </li>
+          <li>
+            The "app" returns an array of bytes representing all the numbers in
+            the countdown from your number to zero.
+          </li>
+          <li>JS displays the countdown on the page</li>
+        </ul>
+
+        <p>
+          Your input is a compile-time constant that gets baked into the "app"
+          by the "compiler". From the JS side, this is all pretty similar to a
+          real REPL. But what's <i>inside</i> the WebAssembly modules is
+          simpler.
+        </p>
+      </section>
+
+      <section class="history">
+        <div class="scroll-wrap">
+          <pre class="scroll">
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+whatever
+things 
+string_buffer
+        </pre
+          >
+        </div>
+      </section>
+
+      <section class="source">
+        <input id="source-input" />
+      </section>
+    </div>
+    <script>
+      const input_source_code = document.getElementById("source-input");
+
+      input_source_code.addEventListener("keyup", detectEnterKey);
+      input_source_code.addEventListener("input", (e) => console.log(e));
+      input_source_code.addEventListener("change", (e) => console.log(e));
+
+      function detectEnterKey(something) {
+        console.log(something);
+      }
+    </script>
+  </body>
+</html>
