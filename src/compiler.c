@@ -1,20 +1,24 @@
+#include <stddef.h>
+#include "byte_slice.h"
 #include "../generated/app_bytes.c"
 
-// #define COUNTDOWN_START_BYTE_OFFSET 0xf9
-#define COUNTDOWN_START_BYTE_OFFSET 0xf5 // ReleaseSmall
+// Manually update this whenever app.c or the C compilation options change!
+#define COUNTDOWN_START_BYTE_OFFSET 0x190
+int expected_start_value = 22;
 
-typedef struct
+ByteSlice app;
+
+ByteSlice *compile_app(char countdown_start)
 {
-    char *address;
-    int size;
-} App;
-
-App app;
-
-App *compile_app(char countdown_start)
-{
-    app_bytes[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;
-    app.address = app_bytes;
-    app.size = sizeof(app_bytes);
+    // Change the countdown start compile-time constant
+    // (...if it's in the place where we think it is!
+    // Otherwise leave it at 22 rather than corrupting the binary)
+    if (app_bytes[COUNTDOWN_START_BYTE_OFFSET] == expected_start_value)
+    {
+        app_bytes[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;
+        expected_start_value = countdown_start;
+    }
+    app.elements = app_bytes;
+    app.length = sizeof(app_bytes);
     return &app;
 }

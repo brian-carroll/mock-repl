@@ -75,34 +75,37 @@
   <body>
     <div class="body-wrapper">
       <section class="text">
-        <h1>The mockin' Roc REPL!</h1>
+        <h1>A mockin' Roc REPL!</h1>
         <p>
           This is a <strong>mock-up</strong> of a Web REPL for Roc. But instead
           of the actual Roc language, it only accepts numbers 0-255! It
-          "compiles" a Wasm module that counts down from that number to zero,
-          and runs it.
+          "compiles" a Wasm module that counts down from that number, and runs
+          it.
         </p>
         <p>
-          Still, most of the infrastructure is similar to what we need for the
-          real Web REPL
+          The same web page should work with minimal adjustments whenever we
+          manage to get a WebAssembly build of the real Roc compiler working.
+          But it was a <i>lot</i> easier to debug with a tiny mock compiler!
         </p>
         <p>How it works</p>
         <ul>
           <li>Two Wasm modules: a fake "compiler", and a fake "app"</li>
           <li>
-            The "compiler" contains an array of bytes that it can modify, based
-            on your input, and pass to JS
+            The "compiler" is a little program that contains an array of bytes,
+            and a function that can modify exactly one of those bytes. The other
+            bytes are just constant numbers... that "just happen" to form a
+            valid WebAssembly module, because I cheated.
           </li>
           <li>
-            JS takes those bytes, turns them into a WebAssembly instance, and
-            runs it
+            JS calls the "compiler" with your input, and it sets the editable
+            byte of the app to the value you chose. JS then reads the whole byte
+            array, creates a WebAssembly instance from it, and runs it.
           </li>
           <li>
-            The "app" returns an array of bytes representing all the numbers in
-            the countdown from your number to zero. (Your input is a
-            compile-time constant from the app's point of view.)
+            The app returns an array of bytes representing all the numbers in
+            the countdown.
           </li>
-          <li>JS transforms those numbers to a string and displays it</li>
+          <li>JS transforms those numbers to a string to display</li>
         </ul>
       </section>
 
@@ -125,24 +128,24 @@
       const elemSourceInput = document.getElementById("source-input");
       const elemHistory = document.getElementById("history-text");
       const historyArray = [];
+      let compiler;
+      loadCompiler("dist/compiler.wasm");
 
-      elemSourceInput.addEventListener("change", onNewSourceLine);
+      elemSourceInput.addEventListener("change", onPressEnter);
 
-      function onNewSourceLine(event) {
+      // -----------------------------------------------------------------
+
+      async function onPressEnter(event) {
         const { target } = event;
         const inputText = target.value;
-        const number = parseInt(inputText);
+        const countdownStart = parseInt(inputText);
 
-        if (number > 0 && number < 255) {
-          const countdown = [];
-          for (let i = number; i; --i) {
-            countdown.push(i);
-          }
+        try {
+          const countdown = await compileAndRunApp(countdownStart);
           const outputText = "[ " + countdown.join(", ") + " ]";
           historyArray.push({ ok: true, inputText, outputText });
-        } else {
-          const outputText =
-            "Error! I only understand numbers from 0-255, because I'm a fake compiler";
+        } catch (e) {
+          const outputText = `${e}`;
           historyArray.push({ ok: false, inputText, outputText });
         }
 
@@ -150,6 +153,49 @@
 
         renderHistory();
       }
+
+      // -----------------------------------------------------------------
+
+      async function compileAndRunApp(countdownStart) {
+        const appBytes = compileAppToBytes(countdownStart);
+        const { instance: app } = await WebAssembly.instantiate(appBytes);
+        return runApp(app);
+      }
+
+      // -----------------------------------------------------------------
+
+      function compileAppToBytes(countdownStart) {
+        if (countdownStart < 0 || countdownStart > 255) {
+          throw new Error(
+            "I only understand numbers from 0-255, because I'm a fake compiler"
+          );
+        }
+
+        const sliceAddr = compiler.exports.compile_app(countdownStart);
+        return getSlice(compiler, sliceAddr);
+      }
+
+      // -----------------------------------------------------------------
+
+      function runApp(app) {
+        const sliceAddr = app.exports.run();
+        return getSlice(app, sliceAddr);
+      }
+
+      // -----------------------------------------------------------------
+
+      function getSlice(instance, sliceAddr) {
+        const memory32 = new Uint32Array(instance.exports.memory.buffer);
+        const memory8 = new Uint8Array(instance.exports.memory.buffer);
+
+        const sliceIndex32 = sliceAddr >> 2;
+        const sliceElements = memory32[sliceIndex32];
+        const sliceLength = memory32[sliceIndex32 + 1];
+
+        return memory8.slice(sliceElements, sliceElements + sliceLength);
+      }
+
+      // -----------------------------------------------------------------
 
       function renderHistory() {
         elemHistory.innerHTML = "";
@@ -168,6 +214,14 @@
           elemHistory.appendChild(outputElem);
         });
         elemHistory.scrollTop = elemHistory.scrollHeight;
+      }
+
+      // -----------------------------------------------------------------
+
+      async function loadCompiler(filename) {
+        const response = fetch(filename);
+        const { instance } = await WebAssembly.instantiateStreaming(response);
+        compiler = instance;
       }
     </script>
   </body>
