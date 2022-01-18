@@ -2,7 +2,7 @@
   <head>
     <style>
       body {
-        background-color: #111;
+        background-color: #222;
         color: #ccc;
         font-family: sans-serif;
         font-size: 18px;
@@ -35,6 +35,7 @@
         left: 0;
         right: 0;
         overflow: auto;
+        background-color: #111;
       }
       section.source {
         display: flex;
@@ -42,8 +43,10 @@
       }
 
       section.source input {
-        height: 50px;
-        background-color: #000;
+        height: 32px;
+        padding: 8px;
+        margin-bottom: 16px;
+        background-color: #111;
         color: #fff;
         font-family: "Courier New", Courier, monospace;
       }
@@ -91,75 +94,26 @@
 
       <section class="history">
         <div class="scroll-wrap">
-          <pre class="scroll">
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-whatever
-things 
-string_buffer
-        </pre
-          >
+          <pre id="history-text" class="scroll"></pre>
         </div>
       </section>
 
       <section class="source">
-        <input id="source-input" />
+        <input
+          id="source-input"
+          type="number"
+          placeholder="Type a number 0-255 and press Enter"
+        />
       </section>
     </div>
     <script>
       const input_source_code = document.getElementById("source-input");
+      const history_text = document.getElementById("history-text");
 
-      input_source_code.addEventListener("keyup", detectEnterKey);
-      input_source_code.addEventListener("input", (e) => console.log(e));
-      input_source_code.addEventListener("change", (e) => console.log(e));
+      input_source_code.addEventListener("change", onNewSourceLine);
 
-      function detectEnterKey(something) {
-        console.log(something);
+      function onNewSourceLine(event) {
+        console.log(event.target.value);
       }
     </script>
   </body>
