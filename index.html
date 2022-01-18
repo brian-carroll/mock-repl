@@ -35,7 +35,27 @@
         left: 0;
         right: 0;
         overflow: auto;
+      }
+      #history-text {
+        margin: 16px 0;
+        padding: 8px;
+      }
+      #history-text .input {
+        margin-bottom: 8px;
+      }
+      #history-text .output {
+        margin-bottom: 16px;
+      }
+      #history-text .output-ok {
+        color: #0f8;
+      }
+      #history-text .output-error {
+        color: #f00;
+      }
+      .code {
+        font-family: "Courier New", Courier, monospace;
         background-color: #111;
+        color: #fff;
       }
       section.source {
         display: flex;
@@ -46,9 +66,6 @@
         height: 32px;
         padding: 8px;
         margin-bottom: 16px;
-        background-color: #111;
-        color: #fff;
-        font-family: "Courier New", Courier, monospace;
       }
     </style>
   </head>
@@ -57,16 +74,16 @@
       <section class="text">
         <h1>The mockin' Roc REPL!</h1>
         <p>
-          This is a <strong>mock-up</strong> of a Web REPL for Roc. It's all
-          fake, there is no actual Roc compiler here... yet. The purpose is to
-          make some progress on the Web UI with simple Wasm modules, to get a
-          clearer picture of what we're aiming for.
+          This is a <strong>mock-up</strong> of a Web REPL for Roc. But instead
+          of the actual Roc language, it only accepts numbers 0-255! It
+          "compiles" a Wasm module that counts down from that number to zero,
+          and runs it.
         </p>
         <p>
-          The only valid inputs are numbers from 0-255, and it only "compiles" a
-          program that will count down from that number to zero.
+          Still, most of the infrastructure is similar to what we need for the
+          real Web REPL
         </p>
-        <p>What we <i>do</i> have is</p>
+        <p>How it works</p>
         <ul>
           <li>Two Wasm modules: a fake "compiler", and a fake "app"</li>
           <li>
@@ -74,46 +91,80 @@
             on your input, and pass to JS
           </li>
           <li>
-            JS takes those bytes, turns them into a WebAssembly "app", and runs
-            it
+            JS takes those bytes, turns them into a WebAssembly instance, and
+            runs it
           </li>
           <li>
             The "app" returns an array of bytes representing all the numbers in
-            the countdown from your number to zero.
+            the countdown from your number to zero. (Your input is a
+            compile-time constant from the app's point of view.)
           </li>
-          <li>JS displays the countdown on the page</li>
+          <li>JS transforms those numbers to a string and displays it</li>
         </ul>
-
-        <p>
-          Your input is a compile-time constant that gets baked into the "app"
-          by the "compiler". From the JS side, this is all pretty similar to a
-          real REPL. But what's <i>inside</i> the WebAssembly modules is
-          simpler.
-        </p>
       </section>
 
       <section class="history">
         <div class="scroll-wrap">
-          <pre id="history-text" class="scroll"></pre>
+          <div id="history-text" class="scroll code"></div>
         </div>
       </section>
 
       <section class="source">
         <input
           id="source-input"
+          class="code"
           type="number"
           placeholder="Type a number 0-255 and press Enter"
         />
       </section>
     </div>
     <script>
-      const input_source_code = document.getElementById("source-input");
-      const history_text = document.getElementById("history-text");
+      const elemSourceInput = document.getElementById("source-input");
+      const elemHistory = document.getElementById("history-text");
+      const historyArray = [];
 
-      input_source_code.addEventListener("change", onNewSourceLine);
+      elemSourceInput.addEventListener("change", onNewSourceLine);
 
       function onNewSourceLine(event) {
-        console.log(event.target.value);
+        const { target } = event;
+        const inputText = target.value;
+        const number = parseInt(inputText);
+
+        if (number > 0 && number < 255) {
+          const countdown = [];
+          for (let i = number; i; --i) {
+            countdown.push(i);
+          }
+          const outputText = "[ " + countdown.join(", ") + " ]";
+          historyArray.push({ ok: true, inputText, outputText });
+        } else {
+          const outputText =
+            "Error! I only understand numbers from 0-255, because I'm a fake compiler";
+          historyArray.push({ ok: false, inputText, outputText });
+        }
+
+        target.value = "";
+
+        renderHistory();
+      }
+
+      function renderHistory() {
+        elemHistory.innerHTML = "";
+        historyArray.forEach(({ ok, inputText, outputText }) => {
+          const inputElem = document.createElement("div");
+          const outputElem = document.createElement("div");
+
+          inputElem.textContent = "> " + inputText;
+          inputElem.classList.add("input");
+
+          outputElem.textContent = outputText;
+          outputElem.classList.add("output");
+          outputElem.classList.add(ok ? "output-ok" : "output-error");
+
+          elemHistory.appendChild(inputElem);
+          elemHistory.appendChild(outputElem);
+        });
+        elemHistory.scrollTop = elemHistory.scrollHeight;
       }
     </script>
   </body>
