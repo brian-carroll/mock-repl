@@ -1,13 +1,13 @@
 #!/bin/bash
 
-app_wasm_file="build/app.wasm"
-app_bytes_include="build/app_bytes.c"
-comp_wasm_file="build/compiler.wasm"
+app_wasm="dist/app.wasm"
+app_include="build/app_bytes.c"
+comp_wasm="dist/compiler.wasm"
 
-mkdir -p build
+mkdir -p build dist
 
-zig9 build-lib -target wasm32-freestanding-musl -dynamic src/app.c -O ReleaseSmall -femit-bin=$app_wasm_file
+zig9 build-lib -target wasm32-freestanding-musl -dynamic src/app.c -O ReleaseSmall -femit-bin=$app_wasm
 
-./print_bytes_as_c_code.js $app_wasm_file > $app_bytes_include
+./print_bytes_as_c_code.js $app_wasm > $app_include
 
-zig9 build-lib -target wasm32-freestanding-musl -dynamic src/compiler.c -O ReleaseSmall -femit-bin=$comp_wasm_file
+zig9 build-lib -target wasm32-freestanding-musl -dynamic src/compiler.c -O ReleaseSmall -femit-bin=$comp_wasm
