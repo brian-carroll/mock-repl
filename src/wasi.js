@@ -16,33 +16,33 @@ function createFakeWasiImports(wasiLinkObject) {
   // https://docs.rs/wasi/latest/wasi/wasi_snapshot_preview1/fn.fd_fdstat_get.html
   function fd_fdstat_get(fd, stat_mut_ptr) {
     /*
-            Tell WASI that stdout is a tty (no seek or tell)
+      Tell WASI that stdout is a tty (no seek or tell)
 
-            https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/isatty.c
+      https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/sources/isatty.c
 
-            *Not* a tty if:
-                (statbuf.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ||
-                  (statbuf.fs_rights_base & (__WASI_RIGHTS_FD_SEEK | __WASI_RIGHTS_FD_TELL)) != 0)
+      *Not* a tty if:
+          (statbuf.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ||
+            (statbuf.fs_rights_base & (__WASI_RIGHTS_FD_SEEK | __WASI_RIGHTS_FD_TELL)) != 0)
 
-            So it's sufficient to set:
-              .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE
-              .fs_rights_base = 0
+      So it's sufficient to set:
+        .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE
+        .fs_rights_base = 0
 
-            https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/headers/public/wasi/api.h
+      https://github.com/WebAssembly/wasi-libc/blob/659ff414560721b1660a19685110e484a081c3d4/libc-bottom-half/headers/public/wasi/api.h
 
-                typedef uint8_t __wasi_filetype_t;
-                typedef uint16_t __wasi_fdflags_t;
-                typedef uint64_t __wasi_rights_t;
-                #define __WASI_FILETYPE_CHARACTER_DEVICE (UINT8_C(2))
-                typedef struct __wasi_fdstat_t { // 24 bytes total
-                    __wasi_filetype_t fs_filetype;        // 1 byte
-                                                          // 1 byte padding
-                    __wasi_fdflags_t fs_flags;            // 2 bytes
-                                                          // 4 bytes padding
-                    __wasi_rights_t fs_rights_base;       // 8 bytes
-                    __wasi_rights_t fs_rights_inheriting; // 8 bytes
-                } __wasi_fdstat_t;
-          */
+          typedef uint8_t __wasi_filetype_t;
+          typedef uint16_t __wasi_fdflags_t;
+          typedef uint64_t __wasi_rights_t;
+          #define __WASI_FILETYPE_CHARACTER_DEVICE (UINT8_C(2))
+          typedef struct __wasi_fdstat_t { // 24 bytes total
+              __wasi_filetype_t fs_filetype;        // 1 byte
+                                                    // 1 byte padding
+              __wasi_fdflags_t fs_flags;            // 2 bytes
+                                                    // 4 bytes padding
+              __wasi_rights_t fs_rights_base;       // 8 bytes
+              __wasi_rights_t fs_rights_inheriting; // 8 bytes
+          } __wasi_fdstat_t;
+    */
     // console.warn(`fd_fdstat_get: ${{ fd, stat_mut_ptr }}`);
     const WASI_FILETYPE_CHARACTER_DEVICE = 2;
     const memory8 = new Uint8Array(wasiLinkObject.exports.memory.buffer);
