@@ -5,7 +5,9 @@ const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
 let compiler;
-loadCompiler("dist/compiler.wasm");
+loadCompiler("dist/compiler.wasm").then((instance) => {
+  compiler = instance;
+});
 
 elemSourceInput.addEventListener("change", onPressEnter);
 
@@ -126,5 +128,5 @@ async function loadCompiler(filename) {
 
   wasiLinkObject.exports = instance.exports;
 
-  compiler = instance;
+  return instance;
 }
