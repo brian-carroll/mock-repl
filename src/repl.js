@@ -17,14 +17,13 @@ async function onPressEnter(event) {
   const { target } = event;
   const inputText = target.value;
 
-  const { app, compileError } = await compileApp(inputText);
-  const ok = !compileError;
+  const { ok, app, error } = await compileApp(inputText);
   if (ok) {
     const resultAddr = app.exports.run();
     const outputText = stringifyResult(app, resultAddr);
     historyArray.push({ ok, inputText, outputText });
   } else {
-    historyArray.push({ ok, inputText, outputText: compileError });
+    historyArray.push({ ok, inputText, outputText: error });
   }
 
   target.value = "";
@@ -45,16 +44,18 @@ async function compileApp(inputText) {
 
   // Compile the text to a Wasm app
   const resultByteArrayAddr = compiler.exports.compile_app(inputTextAddr);
-  const ok = compilerMemory[resultByteArrayAddr] == 1;
+
+  // Decode the compiler result
+  const ok = !!compilerMemory[resultByteArrayAddr];
   const byteArrayAddr = resultByteArrayAddr + 4;
   const byteArray = getByteArray(compiler, byteArrayAddr);
 
   if (ok) {
     const { instance: app } = await WebAssembly.instantiate(byteArray);
-    return { app, compileError: "" };
+    return { ok, app, error: "" };
   } else {
-    const compileError = textDecoder.decode(byteArray);
-    return { app: null, compileError };
+    const error = textDecoder.decode(byteArray);
+    return { ok, app: null, error };
   }
 }
 
