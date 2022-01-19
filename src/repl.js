@@ -20,6 +20,7 @@ async function onPressEnter(event) {
   } catch (e) {
     const outputText = `${e}`;
     historyArray.push({ ok: false, inputText, outputText });
+    console.error(e);
   }
 
   target.value = "";

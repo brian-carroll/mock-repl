@@ -9,12 +9,13 @@ int expected_start_value = 22;
 
 ByteArray *compile_app(char countdown_start)
 {
-    // Change the countdown start compile-time constant
-    // (If it's where we think it is! Otherwise leave it alone rather than corrupting the binary)
+    // Change the countdown start compile-time constant (If it's where we think it is!)
     if (app.bytes[COUNTDOWN_START_BYTE_OFFSET] == expected_start_value)
     {
         app.bytes[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;
         expected_start_value = countdown_start;
+    } else {
+        exit(EXIT_FAILURE);
     }
     return &app;
 }
