@@ -10,7 +10,8 @@ if (!infile) {
 const buffer = fs.readFileSync(infile);
 
 console.log(`
-ByteArray app = {
+ResultByteArray app = {
+    .ok = 1,
     .length = ${buffer.length},
     .bytes = {`)
 buffer.forEach((byte) => {

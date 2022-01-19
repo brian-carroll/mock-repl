@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "byte_array.h"
 #include "../generated/app_bytes.c"
@@ -7,14 +8,30 @@
 #define COUNTDOWN_START_BYTE_OFFSET 0x172
 int expected_start_value = 22;
 
-ByteArray *compile_app(char countdown_start)
+#define MSG_PARSE_ERROR "Error: I only understand numbers from 0-255, because I'm a fake compiler"
+ResultByteArray parse_error = {
+    .ok = 0,
+    .length = sizeof(MSG_PARSE_ERROR),
+    .bytes = MSG_PARSE_ERROR,
+};
+
+ResultByteArray *compile_app(const char *input_text)
 {
+    unsigned int countdown_start;
+    int items_parsed = sscanf(input_text, "%u", &countdown_start);
+    if (items_parsed != 1 || countdown_start > 255)
+    {
+        return &parse_error;
+    }
+
     // Change the countdown start compile-time constant (If it's where we think it is!)
     if (app.bytes[COUNTDOWN_START_BYTE_OFFSET] == expected_start_value)
     {
-        app.bytes[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;
+        app.bytes[COUNTDOWN_START_BYTE_OFFSET] = (char)countdown_start;
         expected_start_value = countdown_start;
-    } else {
+    }
+    else
+    {
         exit(EXIT_FAILURE);
     }
     return &app;

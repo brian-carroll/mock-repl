@@ -1,7 +1,9 @@
 const elemSourceInput = document.getElementById("source-input");
 const elemHistory = document.getElementById("history-text");
 const historyArray = [];
-const textDecoder = new TextDecoder("utf8");
+const textDecoder = new TextDecoder();
+const textEncoder = new TextEncoder();
+
 let compiler;
 loadCompiler("dist/compiler.wasm");
 
@@ -12,18 +14,15 @@ elemSourceInput.addEventListener("change", onPressEnter);
 async function onPressEnter(event) {
   const { target } = event;
   const inputText = target.value;
-  const countdownStart = parseInt(inputText);
 
-  try {
-    const app = await compileApp(countdownStart);
+  const { app, compileError } = await compileApp(inputText);
+  const ok = !compileError;
+  if (ok) {
     const resultAddr = app.exports.run();
     const outputText = stringifyResult(app, resultAddr);
-
-    historyArray.push({ ok: true, inputText, outputText });
-  } catch (e) {
-    const outputText = `${e}`;
-    historyArray.push({ ok: false, inputText, outputText });
-    console.error(e);
+    historyArray.push({ ok, inputText, outputText });
+  } else {
+    historyArray.push({ ok, inputText, outputText: compileError });
   }
 
   target.value = "";
@@ -33,16 +32,28 @@ async function onPressEnter(event) {
 
 // -----------------------------------------------------------------
 
-async function compileApp(countdownStart) {
-  if (countdownStart < 0 || countdownStart > 255) {
-    throw new Error(
-      "I only understand numbers from 0-255, because I'm a fake compiler"
-    );
+async function compileApp(inputText) {
+  const inputTextBytes = textEncoder.encode(inputText);
+
+  // Allocate memory in the compiler and copy the text into it
+  const inputTextAddr = compiler.exports.malloc(inputTextBytes.length + 1);
+  const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
+  compilerMemory.set(inputTextBytes, inputTextAddr);
+  compilerMemory[inputTextBytes.length] = 0; // zero-terminated C string
+
+  // Compile the text to a Wasm app
+  const resultByteArrayAddr = compiler.exports.compile_app(inputTextAddr);
+  const ok = compilerMemory[resultByteArrayAddr] == 1;
+  const byteArrayAddr = resultByteArrayAddr + 4;
+  const byteArray = getByteArray(compiler, byteArrayAddr);
+
+  if (ok) {
+    const { instance: app } = await WebAssembly.instantiate(byteArray);
+    return { app, compileError: "" };
+  } else {
+    const compileError = textDecoder.decode(byteArray);
+    return { app: null, compileError };
   }
-  const sliceAddr = compiler.exports.compile_app(countdownStart);
-  const appBytes = getByteArray(compiler, sliceAddr);
-  const { instance: app } = await WebAssembly.instantiate(appBytes);
-  return app;
 }
 
 // -----------------------------------------------------------------
