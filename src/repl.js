@@ -41,8 +41,11 @@ async function compileRunStringify(countdownStart) {
   const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
   compilerMemory.set(appMemory, bufAddr);
 
-  const stringSliceAddr = compiler.exports.stringify_repl_result(bufAddr, resultAddr);
-  const stringBytes = getByteSlice(compiler, stringSliceAddr);
+  const stringSliceAddr = compiler.exports.stringify_repl_result(
+    bufAddr,
+    resultAddr
+  );
+  const stringBytes = getByteArray(compiler, stringSliceAddr);
   const string = textDecoder.decode(stringBytes);
   compiler.exports.free(bufAddr);
   compiler.exports.free(stringSliceAddr);
@@ -58,7 +61,7 @@ async function compileApp(countdownStart) {
     );
   }
   const sliceAddr = compiler.exports.compile_app(countdownStart);
-  const appBytes = getByteSlice(compiler, sliceAddr);
+  const appBytes = getByteArray(compiler, sliceAddr);
   const { instance: app } = await WebAssembly.instantiate(appBytes);
   return app;
 }
@@ -66,20 +69,20 @@ async function compileApp(countdownStart) {
 // -----------------------------------------------------------------
 
 /**
- * Decode a C ByteSlice to a Uint8Array
+ * Decode a C ByteArray to a Uint8Array
  * @param {WebAssembly.Instance} instance
- * @param {number} sliceAddr
- * @returns
+ * @param {number} addr
+ * @returns {Uint8Array}
  */
-function getByteSlice(instance, sliceAddr) {
+function getByteArray(instance, addr) {
   const memory32 = new Uint32Array(instance.exports.memory.buffer);
   const memory8 = new Uint8Array(instance.exports.memory.buffer);
 
-  const sliceIndex32 = sliceAddr >> 2;
-  const sliceElements = memory32[sliceIndex32];
-  const sliceLength = memory32[sliceIndex32 + 1];
+  const index32 = addr >> 2;
+  const length = memory32[index32];
+  const bytesAddr = addr + 4;
 
-  return memory8.slice(sliceElements, sliceElements + sliceLength);
+  return memory8.slice(bytesAddr, bytesAddr + length);
 }
 
 // -----------------------------------------------------------------
