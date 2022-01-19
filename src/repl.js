@@ -28,26 +28,6 @@ function getCompilerMemory() {
 
 // -----------------------------------------------------------------
 
-async function onPressEnter(event) {
-  const { target } = event;
-  const inputText = target.value;
-
-  const { ok, app, error } = await compileApp(inputText);
-  if (ok) {
-    const resultAddr = app.exports.run();
-    const outputText = stringifyResult(app, resultAddr);
-    historyArray.push({ ok, inputText, outputText });
-  } else {
-    historyArray.push({ ok, inputText, outputText: error });
-  }
-
-  target.value = "";
-
-  renderHistory();
-}
-
-// -----------------------------------------------------------------
-
 async function loadCompiler(filename) {
   const wasiLinkObject = {};
   const importObject = createFakeWasiImports(wasiLinkObject);
@@ -79,6 +59,26 @@ async function loadCompiler(filename) {
   wasiLinkObject.exports = instance.exports;
 
   return instance;
+}
+
+// -----------------------------------------------------------------
+
+async function onPressEnter(event) {
+  const { target } = event;
+  const inputText = target.value;
+
+  const { ok, app, error } = await compileApp(inputText);
+  if (ok) {
+    const resultAddr = app.exports.run();
+    const outputText = stringifyResult(app, resultAddr);
+    historyArray.push({ ok, inputText, outputText });
+  } else {
+    historyArray.push({ ok, inputText, outputText: error });
+  }
+
+  target.value = "";
+
+  renderHistory();
 }
 
 // -----------------------------------------------------------------
