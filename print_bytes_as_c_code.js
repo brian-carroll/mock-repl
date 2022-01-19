@@ -9,14 +9,9 @@ if (!infile) {
 
 const buffer = fs.readFileSync(infile);
 
-console.log(`
-ResultByteArray app = {
-    .ok = 1,
-    .length = ${buffer.length},
-    .bytes = {`)
+console.log("char app[] = {")
 buffer.forEach((byte) => {
   const hex = byte.toString(16).padStart(2, '0');
-  console.log(`        0x${hex},`);
+  console.log(`    0x${hex},`);
 });
-console.log(`    }
-};`)
+console.log(`};`)

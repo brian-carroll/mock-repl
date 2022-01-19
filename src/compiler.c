@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "byte_array.h"
 #include "../generated/app_bytes.c"
@@ -8,54 +9,65 @@
 #define COUNTDOWN_START_BYTE_OFFSET 0x172
 int expected_start_value = 22;
 
-#define MSG_PARSE_ERROR "Error: I only understand numbers from 0-255, because I'm a fake compiler"
-ResultByteArray parse_error = {
-    .ok = 0,
-    .length = sizeof(MSG_PARSE_ERROR),
-    .bytes = MSG_PARSE_ERROR,
-};
+// Functions imported from JavaScript
+void read_input_text(char *dest);
+void write_compiler_result(bool ok, char *src, size_t size);
+void read_app_memory(char *dest);
+void write_output_text(char *src, size_t size);
 
-ResultByteArray *compile_app(const char *input_text)
+char parse_error[] = "Error: I only understand numbers from 0-255, because I'm a fake compiler";
+
+void compile_app(size_t input_text_length)
 {
+    char *input_text = malloc(input_text_length + 1);
+    read_input_text(input_text);
+    input_text[input_text_length] = '\0';
+
     unsigned int countdown_start;
     int items_parsed = sscanf(input_text, "%u", &countdown_start);
+
     if (items_parsed != 1 || countdown_start > 255)
     {
-        return &parse_error;
+        write_compiler_result(false, parse_error, sizeof(parse_error));
     }
-
-    // Change the countdown start compile-time constant (If it's where we think it is!)
-    if (app.bytes[COUNTDOWN_START_BYTE_OFFSET] == expected_start_value)
-    {
-        app.bytes[COUNTDOWN_START_BYTE_OFFSET] = (char)countdown_start;
-        expected_start_value = countdown_start;
-    }
-    else
+    else if (app[COUNTDOWN_START_BYTE_OFFSET] != expected_start_value)
     {
         exit(EXIT_FAILURE);
     }
-    return &app;
+    else
+    {
+        app[COUNTDOWN_START_BYTE_OFFSET] = (char)countdown_start;
+        write_compiler_result(true, app, sizeof(app));
+        expected_start_value = countdown_start;
+    }
+
+    // JS has copied everything it needs, so we can drop the buffer in a Rust-friendly place
+    free(input_text);
 }
 
-ByteArray *stringify_repl_result(char *app_memory_copy, size_t app_result_addr)
+void stringify_app_result(size_t app_memory_size, size_t app_result_addr)
 {
-    size_t *app_memory_words = (size_t *)app_memory_copy;
-    size_t app_result_index = app_result_addr / sizeof(size_t);
+    char *app_memory_copy = malloc(app_memory_size);
+    read_app_memory(app_memory_copy);
 
-    ByteArray *result = (ByteArray *)(app_memory_copy + app_result_addr);
+    ByteArray *app_result = (ByteArray *)(app_memory_copy + app_result_addr);
 
-    ByteArray *output_string = malloc(2048);
-    char *cursor = output_string->bytes;
+    char *output_text = malloc(2048);
+    char *cursor = output_text;
 
     cursor += sprintf(cursor, "[ ");
-    for (size_t i = 0; i < result->length; ++i)
+    for (size_t i = 0; i < app_result->length; ++i)
     {
-        unsigned int byte_val = (unsigned int)(result->bytes[i]);
+        unsigned int byte_val = (unsigned int)(app_result->bytes[i]);
         cursor += sprintf(cursor, "%u, ", byte_val);
     }
     cursor -= 2;
     cursor += sprintf(cursor, " ]");
-    output_string->length = cursor - output_string->bytes;
+    size_t length = cursor - output_text;
 
-    return output_string;
+    write_output_text(output_text, length);
+
+    // JS has copied everything it needs, so we can drop this in a Rust-friendly place
+    free(output_text);
+    free(app_memory_copy);
 }

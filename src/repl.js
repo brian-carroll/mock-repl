@@ -4,12 +4,27 @@ const historyArray = [];
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
+const buffers = {
+  inputText: new Uint8Array(),
+  compilerResult: new Uint8Array(),
+  appMemory: new Uint8Array(),
+  outputText: new Uint8Array(),
+};
+
 let compiler;
 loadCompiler("dist/compiler.wasm").then((instance) => {
   compiler = instance;
 });
 
 elemSourceInput.addEventListener("change", onPressEnter);
+
+// We need a getter for the compiler memory because whenever it grows,
+// the JS ArrayBuffer becomes "detached" and replaced with a new one.
+// The ArrayBuffer interface object cannot be resized. I imagine the
+// implementation doesn't actually move the bytes unless it has to?
+function getCompilerMemory() {
+  return new Uint8Array(compiler.exports.memory.buffer);
+}
 
 // -----------------------------------------------------------------
 
@@ -33,62 +48,72 @@ async function onPressEnter(event) {
 
 // -----------------------------------------------------------------
 
+async function loadCompiler(filename) {
+  const wasiLinkObject = {};
+  const importObject = createFakeWasiImports(wasiLinkObject);
+
+  importObject.env = {
+    main: (i32a, i32b) => 0,
+    read_input_text: (dest) => {
+      getCompilerMemory().set(buffers.inputText, dest);
+    },
+    write_compiler_result: (ok, src, size) => {
+      // .slice creates a new buffer and copies the bytes
+      const bytes = getCompilerMemory().slice(src, src + size);
+      buffers.compilerResult = { ok: !!ok, bytes };
+    },
+    read_app_memory: (dest) => {
+      getCompilerMemory().set(buffers.appMemory, dest);
+    },
+    write_output_text: (src, size) => {
+      buffers.outputText = getCompilerMemory().slice(src, size + src);
+    },
+  };
+
+  const responsePromise = fetch(filename);
+  const { instance } = await WebAssembly.instantiateStreaming(
+    responsePromise,
+    importObject
+  );
+
+  wasiLinkObject.exports = instance.exports;
+
+  return instance;
+}
+
+// -----------------------------------------------------------------
+
 async function compileApp(inputText) {
-  const inputTextBytes = textEncoder.encode(inputText);
+  // Convert text to bytes and put it in a buffer for the compiler
+  buffers.inputText = textEncoder.encode(inputText);
 
-  // Allocate memory in the compiler and copy the text into it
-  const inputTextAddr = compiler.exports.malloc(inputTextBytes.length + 1);
-  const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
-  compilerMemory.set(inputTextBytes, inputTextAddr);
-  compilerMemory[inputTextBytes.length] = 0; // zero-terminated C string
+  // Compiler reads the inputText buffer and writes to the result buffer
+  compiler.exports.compile_app(buffers.inputText.length);
 
-  // Compile the text to a Wasm app
-  const resultByteArrayAddr = compiler.exports.compile_app(inputTextAddr);
-
-  // Decode the compiler result
-  const ok = !!compilerMemory[resultByteArrayAddr];
-  const byteArrayAddr = resultByteArrayAddr + 4;
-  const byteArray = getByteArray(compiler, byteArrayAddr);
-
+  // Handle compiler success or error
+  const { ok, bytes } = buffers.compilerResult;
   if (ok) {
-    const { instance: app } = await WebAssembly.instantiate(byteArray);
+    const { instance: app } = await WebAssembly.instantiate(bytes);
     return { ok, app, error: "" };
   } else {
-    const error = textDecoder.decode(byteArray);
+    const error = textDecoder.decode(bytes);
     return { ok, app: null, error };
   }
 }
 
 // -----------------------------------------------------------------
 
-function stringifyResult(app, resultAddr) {
-  const appMemory = new Uint8Array(app.exports.memory.buffer);
-  const bufAddr = compiler.exports.malloc(appMemory.length);
-  const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
-  compilerMemory.set(appMemory, bufAddr);
+function stringifyResult(app, appResultAddr) {
+  // Put the app memory in a buffer where the compiler can find it
+  buffers.appMemory = new Uint8Array(app.exports.memory.buffer);
 
-  const stringSliceAddr = compiler.exports.stringify_repl_result(
-    bufAddr,
-    resultAddr
+  compiler.exports.stringify_app_result(
+    buffers.appMemory.length,
+    appResultAddr
   );
-  const stringBytes = getByteArray(compiler, stringSliceAddr);
-  const string = textDecoder.decode(stringBytes);
-  compiler.exports.free(bufAddr);
-  compiler.exports.free(stringSliceAddr);
-  return string;
-}
 
-// -----------------------------------------------------------------
-
-function getByteArray(instance, addr) {
-  const memory32 = new Uint32Array(instance.exports.memory.buffer);
-  const memory8 = new Uint8Array(instance.exports.memory.buffer);
-
-  const index32 = addr >> 2;
-  const length = memory32[index32];
-  const bytesAddr = addr + 4;
-
-  return memory8.slice(bytesAddr, bytesAddr + length);
+  // Compiler wrote the output string to another buffer
+  return textDecoder.decode(buffers.outputText);
 }
 
 // -----------------------------------------------------------------
@@ -110,24 +135,4 @@ function renderHistory() {
     elemHistory.appendChild(outputElem);
   });
   elemHistory.scrollTop = elemHistory.scrollHeight;
-}
-
-// -----------------------------------------------------------------
-
-async function loadCompiler(filename) {
-  const wasiLinkObject = {};
-  const importObject = createFakeWasiImports(wasiLinkObject);
-  importObject.env = {
-    main: (i32a, i32b) => 0,
-  };
-
-  const responsePromise = fetch(filename);
-  const { instance } = await WebAssembly.instantiateStreaming(
-    responsePromise,
-    importObject
-  );
-
-  wasiLinkObject.exports = instance.exports;
-
-  return instance;
 }
