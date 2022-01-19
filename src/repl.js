@@ -15,7 +15,10 @@ async function onPressEnter(event) {
   const countdownStart = parseInt(inputText);
 
   try {
-    const outputText = await compileRunStringify(countdownStart);
+    const app = await compileApp(countdownStart);
+    const resultAddr = app.exports.run();
+    const outputText = stringifyResult(app, resultAddr);
+
     historyArray.push({ ok: true, inputText, outputText });
   } catch (e) {
     const outputText = `${e}`;
@@ -26,31 +29,6 @@ async function onPressEnter(event) {
   target.value = "";
 
   renderHistory();
-}
-
-// -----------------------------------------------------------------
-
-async function compileRunStringify(countdownStart) {
-  const app = await compileApp(countdownStart);
-
-  const resultAddr = app.exports.run();
-  const appMemory = new Uint8Array(app.exports.memory.buffer);
-
-  // Create a buffer in the compilerMemory and copy the entire appMemory into it
-  const bufSize = appMemory.length;
-  const bufAddr = compiler.exports.malloc(bufSize);
-  const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
-  compilerMemory.set(appMemory, bufAddr);
-
-  const stringSliceAddr = compiler.exports.stringify_repl_result(
-    bufAddr,
-    resultAddr
-  );
-  const stringBytes = getByteArray(compiler, stringSliceAddr);
-  const string = textDecoder.decode(stringBytes);
-  compiler.exports.free(bufAddr);
-  compiler.exports.free(stringSliceAddr);
-  return string;
 }
 
 // -----------------------------------------------------------------
@@ -69,12 +47,25 @@ async function compileApp(countdownStart) {
 
 // -----------------------------------------------------------------
 
-/**
- * Decode a C ByteArray to a Uint8Array
- * @param {WebAssembly.Instance} instance
- * @param {number} addr
- * @returns {Uint8Array}
- */
+function stringifyResult(app, resultAddr) {
+  const appMemory = new Uint8Array(app.exports.memory.buffer);
+  const bufAddr = compiler.exports.malloc(appMemory.length);
+  const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
+  compilerMemory.set(appMemory, bufAddr);
+
+  const stringSliceAddr = compiler.exports.stringify_repl_result(
+    bufAddr,
+    resultAddr
+  );
+  const stringBytes = getByteArray(compiler, stringSliceAddr);
+  const string = textDecoder.decode(stringBytes);
+  compiler.exports.free(bufAddr);
+  compiler.exports.free(stringSliceAddr);
+  return string;
+}
+
+// -----------------------------------------------------------------
+
 function getByteArray(instance, addr) {
   const memory32 = new Uint32Array(instance.exports.memory.buffer);
   const memory8 = new Uint8Array(instance.exports.memory.buffer);
