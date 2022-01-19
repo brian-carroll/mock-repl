@@ -23,21 +23,14 @@ ByteSlice *compile_app(char countdown_start)
     return &app;
 }
 
-char *app_result_buffer;
-void *allocate_repl_buffer(size_t size)
-{
-    app_result_buffer = malloc(size);
-    return app_result_buffer;
-}
-
 ByteSlice string_slice;
-ByteSlice *stringify_repl_result(size_t app_result_addr)
+ByteSlice *stringify_repl_result(char *app_memory_copy, size_t app_result_addr)
 {
-    size_t *app_result_words = (size_t *)app_result_buffer;
+    size_t *app_memory_words = (size_t *)app_memory_copy;
     size_t app_result_index = app_result_addr / sizeof(size_t);
     ByteSlice result_slice = {
-        .elements = app_result_buffer + app_result_words[app_result_index],
-        .length = app_result_words[app_result_index + 1],
+        .elements = app_memory_copy + app_memory_words[app_result_index],
+        .length = app_memory_words[app_result_index + 1],
     };
 
     char *string_buf = malloc(2048);
@@ -54,12 +47,5 @@ ByteSlice *stringify_repl_result(size_t app_result_addr)
     string_buf += sprintf(string_buf, " ]");
     string_slice.length = string_buf - string_slice.elements;
 
-    free(app_result_buffer);
     return &string_slice;
-}
-
-void free_string_slice()
-{
-    free(string_slice.elements);
-    string_slice.elements = NULL;
 }

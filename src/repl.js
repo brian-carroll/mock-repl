@@ -37,14 +37,15 @@ async function compileRunStringify(countdownStart) {
 
   // Create a buffer in the compilerMemory and copy the entire appMemory into it
   const bufSize = appMemory.length;
-  const bufAddr = compiler.exports.allocate_repl_buffer(bufSize);
+  const bufAddr = compiler.exports.malloc(bufSize);
   const compilerMemory = new Uint8Array(compiler.exports.memory.buffer);
   compilerMemory.set(appMemory, bufAddr);
 
-  const stringSliceAddr = compiler.exports.stringify_repl_result(resultAddr);
+  const stringSliceAddr = compiler.exports.stringify_repl_result(bufAddr, resultAddr);
   const stringBytes = getByteSlice(compiler, stringSliceAddr);
   const string = textDecoder.decode(stringBytes);
-  compiler.exports.free_string_slice();
+  compiler.exports.free(bufAddr);
+  compiler.exports.free(stringSliceAddr);
   return string;
 }
 
