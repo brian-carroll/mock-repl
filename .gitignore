@@ -2,3 +2,9 @@
 /generated
 /dist
 /notes.md
+
+
+# Added by cargo
+
+/target
+Cargo.lock
