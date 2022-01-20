@@ -7,7 +7,7 @@
 
 // Manually update this whenever app.c or the C compilation options change!
 #define COUNTDOWN_START_BYTE_OFFSET 0x172
-int expected_start_value = 22;
+#define DEFAULT_START_VALUE 22
 
 // Functions imported from JavaScript
 void repl_read_compiler_input(char *dest);
@@ -30,15 +30,19 @@ void repl_compile(size_t input_text_length)
     {
         repl_write_compiler_output(false, parse_error, sizeof(parse_error));
     }
-    else if (app[COUNTDOWN_START_BYTE_OFFSET] != expected_start_value)
+    else if (app[COUNTDOWN_START_BYTE_OFFSET] != DEFAULT_START_VALUE)
     {
+        fprintf(stderr,
+                "Template app.wasm changed! Did not find start value %d at offset 0x%x\n", DEFAULT_START_VALUE, COUNTDOWN_START_BYTE_OFFSET);
         exit(EXIT_FAILURE);
     }
     else
     {
-        app[COUNTDOWN_START_BYTE_OFFSET] = (char)countdown_start;
-        repl_write_compiler_output(true, app, sizeof(app));
-        expected_start_value = countdown_start;
+        size_t size = sizeof(app);
+        char *app_copy = malloc(size);
+        memcpy(app_copy, app, size);
+        app_copy[COUNTDOWN_START_BYTE_OFFSET] = (char)countdown_start;
+        repl_write_compiler_output(true, app_copy, size);
     }
 
     // JS has copied everything it needs, so we can drop the buffer in a Rust-friendly place

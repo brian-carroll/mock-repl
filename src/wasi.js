@@ -92,7 +92,11 @@ function createFakeWasiImports(wasiLinkObject) {
     }
     memory32[nwritten_mut_ptr >> 2] = nwritten;
     if (string_buffer) {
-      console.log(string_buffer);
+      if (fd === 1) {
+        console.log(string_buffer);
+      } else {
+        console.error(string_buffer);
+      }
     }
     return 0;
   }
