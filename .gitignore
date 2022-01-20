@@ -2,7 +2,7 @@
 /generated
 /dist
 /notes.md
-
+src/generated_app_bytes.rs
 
 # Added by cargo
 
