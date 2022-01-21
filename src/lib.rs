@@ -27,6 +27,8 @@ pub extern "C" fn repl_compile(input_text_length: usize) {
         repl_read_compiler_input(input_text.as_mut_ptr() as *mut c_void);
     }
 
+    // TODO: create some nonsense to represent type info and put it in the arena
+
     let result = repl_compile_help(&arena, input_text);
     if let Err(msg) = result {
         unsafe {
@@ -60,6 +62,9 @@ fn repl_compile_help(arena: &Bump, input_text: &[u8]) -> Result<(), String> {
 
 #[no_mangle]
 pub extern "C" fn repl_stringify(app_memory_size: usize, app_result_addr: usize) {
+    //
+    // TODO: reuse the arena from earlier and retrieve some stuff out of it
+    //
     let arena = Bump::new();
 
     // Allocate space for a copy of the app module's memory buffer (zero-initialised)
