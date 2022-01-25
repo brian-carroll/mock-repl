@@ -1,8 +1,12 @@
 DEST=../mock-repl-deploy
 
 rm -rf $DEST/*
-mkdir -p $DEST/src $DEST/dist
 
-cp src/*.js $DEST/src
-cp dist/* $DEST/dist
-cp index.html $DEST
+cp dist/* $DEST/
+
+VERSION_SHA=$(git rev-parse HEAD)
+
+cd $DEST
+git add .
+git commit -m "Deployed from $VERSION_SHA"
+git push
