@@ -3,9 +3,6 @@ mod generated_app_bytes;
 use bumpalo::Bump;
 use generated_app_bytes::APP;
 use wasm_bindgen::prelude::wasm_bindgen;
-
-// Seems to be used implicitly by wasm_bindgen macros
-#[allow(unused_imports)]
 use wasm_bindgen::JsValue;
 
 // Manually update these constants whenever app.c or the C compilation options change!
