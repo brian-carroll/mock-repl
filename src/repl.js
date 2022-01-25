@@ -45,13 +45,15 @@ function webrepl_read_result(buffer_alloc_addr) {
   return addr;
 }
 
+let locked = false;
 async function onPressEnter(event) {
-  const { target } = event;
-  const inputText = target.value;
+  if (locked) return;
+  locked = true;
+  const inputText = event.target.value;
+  event.target.value = "";
+
   const historyIndex = createHistoryEntry(inputText);
 
-  target.value = "";
-  target.disabled = true;
   let outputText;
   let ok = true;
   try {
@@ -60,9 +62,9 @@ async function onPressEnter(event) {
     outputText = `${e}`;
     ok = false;
   }
-  target.disabled = false;
 
   updateHistoryEntry(historyIndex, ok, outputText);
+  locked = false;
 }
 
 function createHistoryEntry(inputText) {
