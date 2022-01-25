@@ -3,63 +3,79 @@ const repl = {
   elemHistory: document.getElementById("history-text"),
   elemSourceInput: document.getElementById("source-input"),
 
-  historyArray: [],
+  inputHistory: [],
   textDecoder: new TextDecoder(),
   textEncoder: new TextEncoder(),
 
   compiler: null,
 
-  // Byte buffers for communicating with the compiler
-  buffers: {
-    compilerInput: new Uint8Array(),
-    compilerOutput: { ok: false, bytes: new Uint8Array() },
-    stringifyInput: new Uint8Array(),
-    stringifyOutput: new Uint8Array(),
-  },
+  // Temporary storage for values passing back and forth between JS and Wasm
+  inputBytes: new Uint8Array(),
+  result: { addr: 0, buffer: new ArrayBuffer() },
+  outputBytes: new Uint8Array(),
 };
 
-// Initialise the REPL
+// Initialise
 repl.elemSourceInput.addEventListener("change", onPressEnter);
-loadCompiler("dist/compiler.wasm").then((instance) => {
+initCompiler("dist/compiler.wasm").then((instance) => {
   repl.compiler = instance;
 });
 
 // We need a getter for the compiler memory because whenever it grows,
 // the JS ArrayBuffer becomes "detached" and replaced with a new one.
-// The ArrayBuffer interface object cannot be resized. I imagine the
-// implementation doesn't actually move the bytes unless it has to?
+// The API seems to be designed to make us do this, as ArrayBuffer is not resizeable.
 function getCompilerMemory() {
   return new Uint8Array(repl.compiler.exports.memory.buffer);
 }
 
-// -----------------------------------------------------------------
+const compilerCallbacks = {
+  webrepl_read_input: (addr) => {
+    getCompilerMemory().set(repl.inputBytes, addr);
+  },
 
-async function loadCompiler(filename) {
+  webrepl_execute: async (app_bytes_addr, app_bytes_size, app_memory_size_ptr) => {
+    const compilerMemory = getCompilerMemory();
+
+    // Use .subarray rather than .slice to avoid a copy, since .instantiate copies anyway.
+    const app_bytes = compilerMemory.subarray(
+      app_bytes_addr,
+      app_bytes_addr + app_bytes_size
+    );
+    const { instance: app } = await WebAssembly.instantiate(app_bytes);
+
+    const addr = app.exports.run();
+    const { buffer } = app.exports.memory;
+    repl.result = { addr, buffer };
+
+    // Tell the compiler how large the app's memory is
+    // - Remember, the app can grow its heap while running, by an unknowable amount.
+    // - It has a completely separate ArrayBuffer
+    // - We write the size into the compiler's memory, instead of returning a number,
+    //    to avoid the overhead of wasm_bindgen's generic JsValue.
+    const compilerMemory32 = new Uint32Array(compilerMemory.buffer);
+    compilerMemory32[app_memory_size_ptr >> 2] = buffer.byteLength;
+  },
+
+  webrepl_read_result: (buffer_alloc_addr) => {
+    const { addr, buffer } = repl.result;
+    const appMemory = new Uint8Array(buffer);
+    getCompilerMemory().set(appMemory, buffer_alloc_addr);
+    return addr;
+  },
+
+  webrepl_write_output: (addr, size) => {
+    // Make a copy of the output bytes, before the compiler drops all of its heap values
+    repl.outputBytes = getCompilerMemory().slice(addr, addr + size);
+  },
+
+  // C-style main function. We don't use it, but the compiler Wasm module expects it to exist.
+  main: (_argc, _argv) => 0,
+};
+
+async function initCompiler(filename) {
   const wasiLinkObject = {};
   const importObject = createFakeWasiImports(wasiLinkObject);
-
-  // JS callbacks for the compiler
-  // Input buffers are copied into the compiler's heap at whatever address it allocates.
-  // Output buffers are copied out of the compiler's heap so it can drop them afterwards.
-  // This setup makes it easy to manage lifetimes inside the compiler.
-  importObject.env = {
-    repl_read_compiler_input: (dest) => {
-      getCompilerMemory().set(repl.buffers.compilerInput, dest);
-    },
-    repl_write_compiler_output: (ok, src, size) => {
-      const bytes = getCompilerMemory().slice(src, src + size);
-      repl.buffers.compilerOutput = { ok: !!ok, bytes };
-    },
-    repl_read_stringify_input: (dest) => {
-      getCompilerMemory().set(repl.buffers.stringifyInput, dest);
-    },
-    repl_write_stringify_output: (src, size) => {
-      repl.buffers.stringifyOutput = getCompilerMemory().slice(src, size + src);
-    },
-
-    // C-style main function. We don't use it, but the compiler module imports it.
-    main: (i32a, i32b) => 0,
-  };
+  importObject.env = compilerCallbacks;
 
   // Streaming API allows browser to start processing Wasm while the file is still loading.
   const responsePromise = fetch(filename);
@@ -73,69 +89,46 @@ async function loadCompiler(filename) {
   return instance;
 }
 
-// -----------------------------------------------------------------
-
 async function onPressEnter(event) {
   const { target } = event;
   const inputText = target.value;
-
-  const { ok, bytes } = compile(inputText);
-
-  if (ok) {
-    const { instance: app } = await WebAssembly.instantiate(bytes);
-    const resultAddr = app.exports.run();
-    const outputText = stringify(app, resultAddr);
-    repl.historyArray.push({ ok, inputText, outputText });
-  } else {
-    const error = repl.textDecoder.decode(bytes);
-    repl.historyArray.push({ ok, inputText, outputText: error });
-  }
+  const historyIndex = createHistoryEntry(inputText);
+  repl.inputBytes = repl.textEncoder.encode(inputText);
 
   target.value = "";
+  target.disabled = true;
+  const ok = await repl.compiler.exports.webrepl_run(repl.inputBytes.length);
+  target.disabled = false;
 
-  renderHistory();
+  const outputText = repl.textDecoder.decode(repl.outputBytes);
+
+  updateHistoryEntry(historyIndex, ok, outputText);
 }
 
-// -----------------------------------------------------------------
+function createHistoryEntry(inputText) {
+  const historyIndex = repl.inputHistory.push(inputText);
 
-function compile(inputText) {
-  repl.buffers.compilerInput = repl.textEncoder.encode(inputText);
+  const inputElem = document.createElement("div");
+  inputElem.textContent = "> " + inputText;
+  inputElem.classList.add("input");
 
-  repl.compiler.exports.repl_compile(repl.buffers.compilerInput.length);
+  const historyItem = document.createElement("div");
+  historyItem.appendChild(inputElem);
 
-  return repl.buffers.compilerOutput;
+  repl.elemHistory.appendChild(historyItem);
+  repl.elemHistory.scrollTop = repl.elemHistory.scrollHeight;
+
+  return historyIndex;
 }
 
-// -----------------------------------------------------------------
+function updateHistoryEntry(index, ok, outputText) {
+  const outputElem = document.createElement("div");
+  outputElem.textContent = outputText;
+  outputElem.classList.add("output");
+  outputElem.classList.add(ok ? "output-ok" : "output-error");
 
-function stringify(app, appResultAddr) {
-  repl.buffers.stringifyInput = new Uint8Array(app.exports.memory.buffer);
+  const historyItem = repl.elemHistory.childNodes[index];
+  historyItem.appendChild(outputElem);
 
-  repl.compiler.exports.repl_stringify(
-    repl.buffers.stringifyInput.length,
-    appResultAddr
-  );
-
-  return repl.textDecoder.decode(repl.buffers.stringifyOutput);
-}
-
-// -----------------------------------------------------------------
-
-function renderHistory() {
-  repl.elemHistory.innerHTML = "";
-  repl.historyArray.forEach(({ ok, inputText, outputText }) => {
-    const inputElem = document.createElement("div");
-    const outputElem = document.createElement("div");
-
-    inputElem.textContent = "> " + inputText;
-    inputElem.classList.add("input");
-
-    outputElem.textContent = outputText;
-    outputElem.classList.add("output");
-    outputElem.classList.add(ok ? "output-ok" : "output-error");
-
-    repl.elemHistory.appendChild(inputElem);
-    repl.elemHistory.appendChild(outputElem);
-  });
   repl.elemHistory.scrollTop = repl.elemHistory.scrollHeight;
 }
