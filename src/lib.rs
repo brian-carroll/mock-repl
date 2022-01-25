@@ -51,7 +51,7 @@ pub async fn webrepl_run(input_text: String) -> Result<String, String> {
     Ok(output_text)
 }
 
-fn compile<'a>(arena: &'a Bump, input_text: String) -> Result<(&'a [u8], AppIdentifiers), String> {
+fn compile(arena: &Bump, input_text: String) -> Result<(&[u8], AppIdentifiers), String> {
     if APP[COUNTDOWN_START_BYTE_OFFSET] != DEFAULT_START_VALUE {
         panic!(
             "Template app.wasm changed! Did not find start value {} at offset 0x{:x}\n",
