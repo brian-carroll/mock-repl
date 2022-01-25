@@ -18,48 +18,21 @@ struct AppIdentifiers {
 }
 const MOCK_HEAP_DATA: &str = "This is just some dummy string data";
 
-extern "C" {
-    pub fn webrepl_read_input(addr: *mut u8);
-    pub fn webrepl_read_result(buffer_alloc_addr: *mut u8) -> usize;
-    pub fn webrepl_write_output(addr: *const u8, size: usize);
-}
-
 // Use wasm_bindgen only where it adds a lot of value (e.g. async).
 // It forces all return values from JS to be a generic `JsValue`, which is safe but slow.
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(catch)]
     pub async fn webrepl_execute(
-        app_bytes_addr: *const u8,
-        app_bytes_size: usize,
+        app_bytes: &[u8],
         app_memory_size_ptr: *mut usize,
-    );
+    ) -> Result<(), JsValue>;
+    pub fn webrepl_read_result(buffer_alloc_addr: *mut u8) -> usize;
 }
 
 #[wasm_bindgen]
-pub async fn webrepl_run(input_text_length: usize) -> bool {
-    let arena = Bump::new();
-
-    let result = run(&arena, input_text_length).await;
-    let ok = result.is_ok();
-
-    let output_text = match result {
-        Err(s) => s,
-        Ok(s) => s,
-    };
-
-    unsafe {
-        webrepl_write_output(output_text.as_ptr(), output_text.len());
-    }
-
-    ok
-}
-
-async fn run(arena: &Bump, input_text_length: usize) -> Result<String, String> {
-    // Ask JS to give us a copy of the user's input text
-    let input_text: &mut [u8] = arena.alloc_slice_fill_default(input_text_length);
-    unsafe {
-        webrepl_read_input(input_text.as_mut_ptr());
-    }
+pub async fn webrepl_run(input_text: String) -> Result<String, String> {
+    let arena = &Bump::new();
 
     // Compile the app
     let (app_bytes, identifiers) = compile(arena, input_text)?;
@@ -67,11 +40,13 @@ async fn run(arena: &Bump, input_text_length: usize) -> Result<String, String> {
     // Execute the app (asynchronously in JS)
     let mut app_final_memory_size: usize = 0;
     let size_mut_ptr = (&mut app_final_memory_size) as *mut usize;
-    webrepl_execute(app_bytes.as_ptr(), app_bytes.len(), size_mut_ptr).await;
+    if let Err(js_value) = webrepl_execute(app_bytes, size_mut_ptr).await {
+        return Err(format!("{:?}", js_value));
+    }
 
     // Get the root address of the result in the app's memory, and a copy of its memory buffer
     let app_memory_copy: &mut [u8] = arena.alloc_slice_fill_default(app_final_memory_size);
-    let app_result_addr = unsafe { webrepl_read_result(app_memory_copy.as_mut_ptr()) };
+    let app_result_addr = webrepl_read_result(app_memory_copy.as_mut_ptr());
 
     // Get a String representation of the result value
     let output_text = stringify(app_memory_copy, app_result_addr, identifiers);
@@ -79,7 +54,7 @@ async fn run(arena: &Bump, input_text_length: usize) -> Result<String, String> {
     Ok(output_text)
 }
 
-fn compile<'a>(arena: &'a Bump, input_text: &[u8]) -> Result<(&'a [u8], AppIdentifiers), String> {
+fn compile<'a>(arena: &'a Bump, input_text: String) -> Result<(&'a [u8], AppIdentifiers), String> {
     if APP[COUNTDOWN_START_BYTE_OFFSET] != DEFAULT_START_VALUE {
         panic!(
             "Template app.wasm changed! Did not find start value {} at offset 0x{:x}\n",
@@ -87,8 +62,7 @@ fn compile<'a>(arena: &'a Bump, input_text: &[u8]) -> Result<(&'a [u8], AppIdent
         );
     }
 
-    let input_str = std::str::from_utf8(input_text).map_err(|e| format!("{:?}", e))?;
-    let countdown_start = input_str.parse::<u8>().map_err(|e| format!("{:?}", e))?;
+    let countdown_start = input_text.parse::<u8>().map_err(|e| format!("{:?}", e))?;
 
     let app_copy = arena.alloc_slice_copy(APP);
     app_copy[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;

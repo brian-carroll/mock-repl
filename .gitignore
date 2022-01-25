@@ -4,6 +4,9 @@
 /notes.md
 src/generated_app_bytes.rs
 
+# wasm-pack
+/pkg
+
 # Added by cargo
 
 /target
