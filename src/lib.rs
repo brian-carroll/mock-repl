@@ -15,8 +15,6 @@ struct AppIdentifiers {
 }
 const MOCK_HEAP_DATA: &str = "This is just some dummy string data";
 
-// Use wasm_bindgen only where it adds a lot of value (e.g. async).
-// It forces all return values from JS to be a generic `JsValue`, which is safe but slow.
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(catch)]
