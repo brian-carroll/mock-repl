@@ -3,7 +3,10 @@ window.webrepl_execute = webrepl_execute;
 window.webrepl_read_result = webrepl_read_result;
 import * as mock_repl from "./mock_repl.js";
 
+// ----------------------------------------------------------------------------
 // REPL state
+// ----------------------------------------------------------------------------
+
 const repl = {
   elemHistory: document.getElementById("history-text"),
   elemSourceInput: document.getElementById("source-input"),
@@ -26,28 +29,9 @@ mock_repl.default().then((instance) => {
   repl.compiler = instance;
 });
 
-async function webrepl_execute(app_bytes, app_memory_size_ptr) {
-  const { instance: app } = await WebAssembly.instantiate(app_bytes);
-
-  const addr = app.exports.run();
-  const { buffer } = app.exports.memory;
-  repl.result = { addr, buffer };
-
-  // Tell Rust how much space to reserve for its copy of the app's memory buffer.
-  // (The app might have grown its heap while running, so the size is only known now.)
-  // Write the result to memory instead of returning, since wasm_bindgen only allows
-  // imported async functions to return JsValue, which has some conversion overhead.
-  const compilerMemory32 = new Uint32Array(repl.compiler.memory.buffer);
-  compilerMemory32[app_memory_size_ptr >> 2] = buffer.byteLength;
-}
-
-function webrepl_read_result(buffer_alloc_addr) {
-  const { addr, buffer } = repl.result;
-  const appMemory = new Uint8Array(buffer);
-  const compilerMemory8 = new Uint8Array(repl.compiler.memory.buffer);
-  compilerMemory8.set(appMemory, buffer_alloc_addr);
-  return addr;
-}
+// ----------------------------------------------------------------------------
+// Handle inputs
+// ----------------------------------------------------------------------------
 
 function onInputChange(event) {
   const inputText = event.target.value;
@@ -80,6 +64,41 @@ async function processInputQueue() {
     repl.inputQueue.shift();
   }
 }
+
+// ----------------------------------------------------------------------------
+// Callbacks to JS from Rust
+// ----------------------------------------------------------------------------
+
+// Transform the app bytes into a Wasm module and execute it
+// Cache the result but don't send it to Rust yet, as it needs to allocate space first.
+// Then it will immediately call webrepl_read_result.
+async function webrepl_execute(app_bytes, app_memory_size_ptr) {
+  const { instance: app } = await WebAssembly.instantiate(app_bytes);
+
+  const addr = app.exports.run();
+  const { buffer } = app.exports.memory;
+  repl.result = { addr, buffer };
+
+  // Tell Rust how much space to reserve for its copy of the app's memory buffer.
+  // The app might have grown its heap while running, so we couldn't predict it beforehand.
+  // Write the result to memory instead of returning, since wasm_bindgen only allows
+  // imported async functions to return JsValue, which has some conversion overhead.
+  const compilerMemory32 = new Uint32Array(repl.compiler.memory.buffer);
+  compilerMemory32[app_memory_size_ptr >> 2] = buffer.byteLength;
+}
+
+// Now that the Rust app has allocated space for the app's memory buffer, we can copy it
+function webrepl_read_result(buffer_alloc_addr) {
+  const { addr, buffer } = repl.result;
+  const appMemory = new Uint8Array(buffer);
+  const compilerMemory = new Uint8Array(repl.compiler.memory.buffer);
+  compilerMemory.set(appMemory, buffer_alloc_addr);
+  return addr;
+}
+
+// ----------------------------------------------------------------------------
+// Rendering
+// ----------------------------------------------------------------------------
 
 function createHistoryEntry(inputText) {
   const historyIndex = repl.inputHistory.length;
