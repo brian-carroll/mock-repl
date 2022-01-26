@@ -78,8 +78,8 @@
         <h1>A mockin' Roc REPL!</h1>
         <p>
           This is a <strong>mock-up</strong> Web REPL for a fake compiler. The
-          only valid inputs are the numbers 0-255! It "compiles" a Wasm module
-          that counts backwards from that number to 1.
+          only valid inputs are the numbers 0-255! The output program is a Wasm
+          module that counts backwards from that number to 1.
         </p>
         <p>
           The same web page should work with minimal adjustments whenever we
@@ -88,31 +88,17 @@
         </p>
         <p>How it works</p>
         <ul>
-          <li>There are two Wasm modules: a "compiler", and an "app"</li>
+          <li>There are two Wasm modules: a compiler, and an app</li>
           <li>
-            The "compiler" is a little program that contains an array of bytes,
-            and a function that can modify exactly one of those bytes. The other
-            bytes are just constant numbers... that "just happen" to form a
-            valid WebAssembly module (because I cheated).
+            The compiler simply modifies a single byte in an otherwise fixed
+            Wasm binary, using your input.
           </li>
+          <li>The compiler sends the Wasm binary to JS, which runs it</li>
           <li>
-            JS calls the "compiler" with your input, and overwrites one byte of
-            the app with it. JS then reads the whole byte array, creates a
-            WebAssembly instance from it, and runs it.
+            JS calls back into another function in the compiler that stringifies
+            the result from the app
           </li>
-          <li>
-            The Wasm app returns the address in its own memory where it wrote
-            the result.
-          </li>
-          <li>
-            JS calls back into another function in the "compiler", passing the
-            entire memory of the app as an array of bytes, and the index of the
-            result in that array.
-          </li>
-          <li>
-            The "compiler" then finds the array of numbers and stringifies it.
-          </li>
-          <li>JS reads the string and displays it</li>
+          <li>JS reads the string and displays it under the input</li>
         </ul>
       </section>
 
