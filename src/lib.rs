@@ -35,20 +35,22 @@ pub async fn webrepl_run(input_text: String) -> Result<String, String> {
     // Execute the app (asynchronously in JS)
     let mut app_final_memory_size: usize = 0;
     let size_mut_ptr = (&mut app_final_memory_size) as *mut usize;
-    if let Err(js_value) = webrepl_execute(app_bytes, size_mut_ptr).await {
-        return Err(format!("{:?}", js_value));
-    }
+    webrepl_execute(app_bytes, size_mut_ptr)
+        .await
+        .map_err(|js| format!("{:?}", js))?;
 
-    // Get the root address of the result in the app's memory, and a copy of its memory buffer
+    // Get the address of the result in the app's memory, and a copy of its memory buffer
     let app_memory_copy: &mut [u8] = arena.alloc_slice_fill_default(app_final_memory_size);
     let app_result_addr = webrepl_read_result(app_memory_copy.as_mut_ptr());
 
-    // Get a String representation of the result value
+    // Create a String representation of the result value
     let output_text = stringify(app_memory_copy, app_result_addr, identifiers);
 
     Ok(output_text)
 }
 
+/// Compile the user's input code to a Wasm binary and some metadata
+/// This is fake and will be replaced in the final version
 fn compile(arena: &Bump, input_text: String) -> Result<(&[u8], AppIdentifiers), String> {
     if APP[COUNTDOWN_START_BYTE_OFFSET] != DEFAULT_START_VALUE {
         panic!(
@@ -62,13 +64,15 @@ fn compile(arena: &Bump, input_text: String) -> Result<(&[u8], AppIdentifiers), 
     let app_copy = arena.alloc_slice_copy(APP);
     app_copy[COUNTDOWN_START_BYTE_OFFSET] = countdown_start;
 
-    let fake_type_info = AppIdentifiers {
+    let fake_types_and_names = AppIdentifiers {
         dummy: MOCK_HEAP_DATA.to_string(),
     };
 
-    Ok((app_copy, fake_type_info))
+    Ok((app_copy, fake_types_and_names))
 }
 
+/// Create a String representation of the result value from the app
+/// This is fake and will be replaced in the final version
 fn stringify(app_memory_copy: &[u8], app_result_addr: usize, idents: AppIdentifiers) -> String {
     // Get the bytes of the app's result struct (C ByteArray)
     let result = &app_memory_copy[app_result_addr..];
