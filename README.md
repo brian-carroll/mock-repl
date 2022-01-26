@@ -12,6 +12,4 @@ How it works
 - JS calls back into another function in the compiler that stringifies the result from the app
 - JS reads the string and displays it under the input
 
-![screenshot](./mock-repl.png)
-
-See the deployed version on [GitHub Pages](https://brian-carroll.github.io/mock-repl/)
+See it live on [GitHub Pages](https://brian-carroll.github.io/mock-repl/)
